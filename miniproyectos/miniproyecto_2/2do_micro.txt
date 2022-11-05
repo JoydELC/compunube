@@ -1,0 +1,93 @@
+//////////////// Punto #1: comandos crear cluster de kubernetes ///////////////
+
+PASO#1: Compruebo proveedores:
+
+az provider show -n Microsoft.OperationsManagement -o table
+az provider show -n Microsoft.OperationalInsights -o table
+
+*Si no estan los registro:
+
+az provider register --namespace Microsoft.OperationsManagement
+az provider register --namespace Microsoft.OperationalInsights
+
+PASO#2: Creo mi grupo de recursos 
+
+az group create --name compu_nube --location eastus
+
+PASO#3: Creo mi cluster , con node count 2 para tener dos agentes.
+
+az aks create -g compu_nube -n microproyecto_2 --enable-managed-identity --node-count 2 --enable-addons monitoring --generate-ssh-keys
+
+PASO#4: Conectarse al cluster y verificar los nodos que estan funcionando(AZURE CLI)
+
+az aks get-credentials --resource-group compu_nube --name microproyecto_2
+
+*verificar que nodos corren
+
+kubectl get nodes
+
+PASO#4 BIS CLOUD SHELL
+
+Import-AzAksCredential -ResourceGroupName compu_nube -Name microproyecto_2
+
+kubectl get nodes
+
+//////////////////// Punto#2: Aplicacion de clasificacion de imagenes en azure /////////////////////////
+Vamos a obtener la imagen realizada por el dueño del tutorial, entonces creamos en depleyment.yaml
+en una carpeta llamada punto_2
+
+aplicamos el .yaml
+
+kubectl apply -f deployment.yaml
+
+exponer el deployment
+
+kubectl expose deployment kubermatic-dl-deployment  --type=LoadBalancer --port 80 --target-port 5000
+
+Chekqueamos nuestro servicio
+kubectl get service
+
+meterme a un lugar donde este la imagen de prueba y correr, con la ip de nuestro servicio
+
+ curl -X POST -F img=@prueba_1.jpg http://40.76.148.188/predict
+
+
+////////////// Punto 3: Implementacion de una aplicacion //////////
+
+PASO#1: creo el .yaml obtenido en el tutorial
+vim azure-vote.yaml
+PASO#2: aplico mi .yaml
+kubectl apply -f azure-vote.yaml
+PASO#3: Comprobar el estado del front-end
+kubectl get service azure-vote-front --watch
+PASO#4: Ver la external ip y correrla en el localhost
+20.121.176.129  (en mi caso)
+
+
+//////////////// Punto 4: Supervision y monitoreo /////////////
+En esta ocasion utilizaremos el azure monitor para supervisar AKS
+
+Configuracion de la supervision
+
+//////////////// Punto bonus ////////////////////////////////
+
+minikube addons enable metrics-server
+
+creo la carpeta application con su contenido
+
+aplico el yaml
+kubectl apply -f https://k8s.io/examples/application/php-apache.yaml
+
+activo el hpa
+
+kubectl autoscale deployment php-apache --cpu-percent=50 --min=1 --max=10
+
+aplico carga
+
+kubectl run -i --tty load-generator --rm --image=busybox:1.28 --restart=Never -- /bin/sh -c "while sleep 0.01; do wget -q -O- http://php-apache; done"
+
+analizo funcionamiento
+
+kubectl get hpa php-apache --watch
+
+
